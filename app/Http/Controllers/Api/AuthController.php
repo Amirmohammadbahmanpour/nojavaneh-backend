@@ -106,33 +106,62 @@ class AuthController extends Controller
     public function completeProfile(Request $request)
     {
         $user = $request->user();
-        $profile = Profile::where('user_id', $user->id)->first();
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $user->id],
+            ['role' => 'user']
+        );
         
         $request->validate([
             'full_name' => 'required|string|max:255',
             'password' => 'required|string|min:6',
             'email' => 'nullable|email',
+            'mother_age' => 'nullable|integer',
+            'mother_education' => 'nullable|string',
+            'father_education' => 'nullable|string',
+            'mother_employment_status' => 'nullable|string',
+            'family_income_status' => 'nullable|string',
+            'number_of_children' => 'nullable|integer',
+            'number_of_teenagers' => 'nullable|integer',
+            'teenager_gender' => 'nullable|string',
+            'teenager_age_range' => 'nullable|string',
+            'has_attended_parenting_course' => 'nullable|boolean',
+            'teenager_phone_internet_usage' => 'nullable|string',
+            'teenager_living_with' => 'nullable|string',
             'age' => 'nullable|integer',
             'education' => 'nullable|string',
             'economic_status' => 'nullable|string',
-            'number_of_children' => 'nullable|integer',
-            'children_ages' => 'nullable|integer',
         ]);
         
         // بروزرسانی نام کاربر و رمز عبور
         $user->name = $request->full_name;
-        $user->email = $request->email ?? $user->email;
+        if ($request->filled('email')) {
+            $user->email = $request->email;
+        }
         $user->password = Hash::make($request->password);
         $user->save();
         
+        $age = $request->mother_age ?? $request->age;
+        $education = $request->mother_education ?? $request->education;
+        $economicStatus = $request->family_income_status ?? $request->economic_status;
+
         // بروزرسانی پروفایل
         $profile->update([
             'full_name' => $request->full_name,
-            'age' => $request->age,
-            'education' => $request->education,
-            'economic_status' => $request->economic_status,
-            'number_of_children' => $request->number_of_children,
-            'children_ages' => $request->children_ages,
+            'age' => $age,
+            'education' => $education,
+            'economic_status' => $economicStatus,
+            'number_of_children' => $request->number_of_children ?? 0,
+            'mother_age' => $request->mother_age ?? $age,
+            'mother_education' => $request->mother_education ?? $education,
+            'father_education' => $request->father_education,
+            'mother_employment_status' => $request->mother_employment_status,
+            'family_income_status' => $economicStatus,
+            'number_of_teenagers' => $request->number_of_teenagers ?? 0,
+            'teenager_gender' => $request->teenager_gender,
+            'teenager_age_range' => $request->teenager_age_range,
+            'has_attended_parenting_course' => $request->has_attended_parenting_course ?? false,
+            'teenager_phone_internet_usage' => $request->teenager_phone_internet_usage,
+            'teenager_living_with' => $request->teenager_living_with,
         ]);
         
         return response()->json([
@@ -145,9 +174,14 @@ class AuthController extends Controller
     public function user(Request $request)
     {
         $user = $request->user();
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $user->id],
+            ['role' => 'user']
+        );
+
         return response()->json([
             'user' => $user,
-            'profile' => $user->profile,
+            'profile' => $profile,
         ]);
     }
 

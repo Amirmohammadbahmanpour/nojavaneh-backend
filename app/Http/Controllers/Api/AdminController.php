@@ -323,4 +323,38 @@ public function deleteUser(Request $request, string $id)
         return response()->json(['message' => 'خطا در حذف کاربر'], 500);
     }
 }
+
+    // لیست دروس برای ادمین
+    public function lessons(Request $request)
+    {
+        if (!$this->isAdmin($request)) {
+            return response()->json(['message' => 'دسترسی غیرمجاز'], 403);
+        }
+
+        $lessons = Lesson::with('category')
+            ->orderBy('order_index')
+            ->get();
+
+        return response()->json($lessons);
+    }
+
+    // آپلود تصویر برای ادمین
+    public function uploadImage(Request $request)
+    {
+        if (!$this->isAdmin($request)) {
+            return response()->json(['message' => 'دسترسی غیرمجاز'], 403);
+        }
+
+        $request->validate([
+            'image' => 'required|image|max:10240',
+        ]);
+
+        $file = $request->file('image');
+        $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('uploads', $filename, 'public');
+
+        $url = asset('storage/' . $path);
+
+        return response()->json(['url' => $url]);
+    }
 }

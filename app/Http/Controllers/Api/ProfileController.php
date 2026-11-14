@@ -11,27 +11,23 @@ class ProfileController extends Controller
     // دریافت پروفایل کاربر
     public function update(Request $request, $userId)
     {
-        $profile = Profile::where('user_id', $userId)->firstOrFail();
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $userId],
+            ['role' => 'user']
+        );
         
+        $fields = [
+            'full_name', 'age', 'education', 'economic_status', 'number_of_children', 'children_ages',
+            'mother_age', 'mother_education', 'father_education', 'mother_employment_status',
+            'family_income_status', 'number_of_teenagers', 'teenager_gender', 'teenager_age_range',
+            'has_attended_parenting_course', 'teenager_phone_internet_usage', 'teenager_living_with'
+        ];
+
         $data = [];
-        
-        if ($request->has('full_name')) {
-            $data['full_name'] = $request->full_name;
-        }
-        if ($request->has('age')) {
-            $data['age'] = $request->age;
-        }
-        if ($request->has('education')) {
-            $data['education'] = $request->education;
-        }
-        if ($request->has('economic_status')) {
-            $data['economic_status'] = $request->economic_status;
-        }
-        if ($request->has('number_of_children')) {
-            $data['number_of_children'] = $request->number_of_children;
-        }
-        if ($request->has('children_ages')) {
-            $data['children_ages'] = $request->children_ages;
+        foreach ($fields as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->input($field);
+            }
         }
         
         $profile->update($data);
@@ -41,25 +37,25 @@ class ProfileController extends Controller
     
     public function show($userId)
     {
-        $profile = Profile::where('user_id', $userId)->firstOrFail();
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $userId],
+            ['role' => 'user']
+        );
         
-        return response()->json([
-            'full_name' => $profile->full_name,
-            'age' => $profile->age,
-            'education' => $profile->education,
-            'economic_status' => $profile->economic_status,
-            'number_of_children' => $profile->number_of_children,
-            'children_ages' => $profile->children_ages,
-        ]);
+        return response()->json($profile);
     }
+
     // دریافت اطلاعات کامل کاربر (برای داشبورد)
     public function dashboard($userId)
     {
-        $profile = Profile::where('user_id', $userId)->firstOrFail();
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $userId],
+            ['role' => 'user']
+        );
         
         // محاسبه پیشرفت کلی
-        $totalLessons = $profile->user->progress()->count();
-        $completedLessons = $profile->user->progress()->where('is_completed', true)->count();
+        $totalLessons = $profile->user ? $profile->user->progress()->count() : 0;
+        $completedLessons = $profile->user ? $profile->user->progress()->where('is_completed', true)->count() : 0;
         
         return response()->json([
             'profile' => $profile,

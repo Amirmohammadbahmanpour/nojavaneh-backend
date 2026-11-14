@@ -11,10 +11,10 @@ return new class extends Migration
         Schema::create('lesson_likes', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('lesson_id')->constrained()->onDelete('cascade');
-            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();
             
-            $table->unique(['lesson_id', 'user_id']); // هر کاربر فقط یک بار میتونه لایک کنه
+            $table->unique(['lesson_id', 'user_id']);
         });
     }
 

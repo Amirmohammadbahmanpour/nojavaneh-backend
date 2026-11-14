@@ -21,7 +21,7 @@ class LessonController extends Controller
         $lessons = $query->orderBy('order_index')->get();
         
         // اضافه کردن وضعیت تکمیل برای هر درس
-        $userId = auth()->id();
+        $userId = auth('sanctum')->id() ?? auth()->id();
         if ($userId) {
             $completedLessons = UserProgress::where('user_id', $userId)
                 ->where('is_completed', true)
@@ -41,12 +41,12 @@ class LessonController extends Controller
     }
 
     // دریافت جزئیات یک درس
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $lesson = Lesson::with('category')->findOrFail($id);
         
         // اضافه کردن وضعیت تکمیل برای کاربر جاری
-        $userId = auth()->id();
+        $userId = auth('sanctum')->id() ?? auth()->id();
         $isCompleted = false;
         
         if ($userId) {

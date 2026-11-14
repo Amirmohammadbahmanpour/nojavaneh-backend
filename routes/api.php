@@ -54,8 +54,12 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // دروس و پیشرفت
     Route::get('/my-progress', [ProgressController::class, 'index']);
+    Route::get('/user-progress', [ProgressController::class, 'index']); // Alias
     Route::post('/progress', [ProgressController::class, 'store']);
     Route::get('/progress-stats', [ProgressController::class, 'stats']);
+
+    // آپلود تصویر
+    Route::post('/upload/image', [AdminController::class, 'uploadImage']);
     
     // نظرات
     Route::post('/comments', [CommentController::class, 'store']);
@@ -109,9 +113,11 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::delete('/posts/{id}', [AdminController::class, 'deletePost']);
     
     // مدیریت دروس
+    Route::get('/lessons', [AdminController::class, 'lessons']);
     Route::post('/lessons', [AdminController::class, 'storeLesson']);
     Route::put('/lessons/{id}', [AdminController::class, 'updateLesson']);
     Route::delete('/lessons/{id}', [AdminController::class, 'deleteLesson']);
+    Route::post('/upload/image', [AdminController::class, 'uploadImage']);
 });
 
 // ========== مسیرهای تست (فقط برای توسعه) ==========

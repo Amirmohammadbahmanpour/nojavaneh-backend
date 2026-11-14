@@ -12,8 +12,8 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->text('content');
             $table->foreignUuid('post_id')->constrained('blog_posts')->onDelete('cascade');
-            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
-            $table->foreignUuid('parent_id')->nullable()->references('id')->on('comments');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('parent_id')->nullable()->references('id')->on('comments')->onDelete('cascade');
             $table->boolean('is_approved')->default(false);
             $table->timestamps();
         });

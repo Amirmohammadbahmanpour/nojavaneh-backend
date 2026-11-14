@@ -15,7 +15,7 @@ return new class extends Migration
             $table->longText('content');
             $table->string('image_url')->nullable();
             $table->text('description')->nullable();
-            $table->foreignUuid('author_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('author_id')->constrained('users')->onDelete('cascade');
             $table->boolean('is_published')->default(false);
             $table->timestamp('published_at')->nullable();
             $table->timestamps();

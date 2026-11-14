@@ -19,15 +19,30 @@ class Profile extends Model
         'education',
         'economic_status',
         'number_of_children',
-        'children_ages',  // ← این خط حتماً باشه
-        'role'
+        'children_ages',
+        'role',
+        'mother_age',
+        'mother_education',
+        'father_education',
+        'mother_employment_status',
+        'family_income_status',
+        'number_of_teenagers',
+        'teenager_gender',
+        'teenager_age_range',
+        'has_attended_parenting_course',
+        'has_attended_workshop',
+        'teenager_phone_internet_usage',
+        'teenager_living_with',
     ];
 
     protected $casts = [
         'age' => 'integer',
+        'mother_age' => 'integer',
         'number_of_children' => 'integer',
+        'number_of_teenagers' => 'integer',
         'children_ages' => 'array',
         'has_attended_workshop' => 'boolean',
+        'has_attended_parenting_course' => 'boolean',
     ];
 
     public function user()
