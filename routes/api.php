@@ -38,6 +38,8 @@ Route::get('/blog', [BlogController::class, 'index']);
 Route::get('/blog/{slug}', [BlogController::class, 'show']);
 Route::get('/blog/{id}/related', [BlogController::class, 'related']);
 Route::get('/posts/{postId}/comments', [CommentController::class, 'index']);
+Route::get('/posts/{id}/likes-count', [LikeController::class, 'getPostLikesCount']);
+Route::get('/comments/{id}/likes-count', [LikeController::class, 'getCommentLikesCount']);
 
 // ========== مسیرهای محافظت شده (نیاز به لاگین) ==========
 Route::middleware('auth:sanctum')->group(function () {
@@ -74,10 +76,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // چک کردن لایک
     Route::get('/like/post/check', [LikeController::class, 'checkPostLike']);
     Route::get('/like/comment/check', [LikeController::class, 'checkCommentLike']);
-    
-    // تعداد لایک
-    Route::get('/posts/{id}/likes-count', [LikeController::class, 'getPostLikesCount']);
-    Route::get('/comments/{id}/likes-count', [LikeController::class, 'getCommentLikesCount']);
     
     // آزمون‌ها
     Route::get('/user-exams', [ExamController::class, 'index']);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PostLike;
 use App\Models\CommentLike;
+use App\Models\LessonLike;
 use Illuminate\Http\Request;
 
 class LikeController extends Controller
@@ -108,6 +109,36 @@ class LikeController extends Controller
     {
         $count = PostLike::where('post_id', $id)->count();
         return response()->json(['count' => $count]);
+    }
+
+    // ========== لایک درس ==========
+    public function toggleLesson(Request $request)
+    {
+        $request->validate([
+            'lesson_id' => 'required|exists:lessons,id',
+        ]);
+
+        $like = LessonLike::where('lesson_id', $request->lesson_id)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if ($like) {
+            $like->delete();
+            $liked = false;
+        } else {
+            LessonLike::create([
+                'lesson_id' => $request->lesson_id,
+                'user_id' => $request->user()->id,
+            ]);
+            $liked = true;
+        }
+
+        $count = LessonLike::where('lesson_id', $request->lesson_id)->count();
+
+        return response()->json([
+            'liked' => $liked,
+            'count' => $count,
+        ]);
     }
 
     public function getCommentLikesCount($id)

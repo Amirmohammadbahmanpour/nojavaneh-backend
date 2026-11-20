@@ -72,7 +72,10 @@ class AdminController extends Controller
             'role' => 'required|in:user,admin',
         ]);
 
-        $profile = Profile::where('user_id', $id)->firstOrFail();
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $id],
+            ['role' => 'user']
+        );
         $profile->update(['role' => $request->role]);
 
         return response()->json(['message' => 'نقش کاربر با موفقیت تغییر کرد']);
@@ -168,7 +171,7 @@ public function storePost(Request $request)
     $request->validate([
         'title' => 'required|string|max:255',
         'description' => 'required|string',
-        'image_url' => 'nullable|url',
+        'image_url' => 'nullable|string',
     ]);
     
     if (empty($content)) {
@@ -245,11 +248,17 @@ public function updatePost(Request $request, string $id)
             'title' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
             'description' => 'nullable|string',
-            'video_url' => 'nullable|url',
-            'podcast_url' => 'nullable|url',
-            'lesson_content' => 'nullable|string',
-            'order_index' => 'integer',
+            'video_url' => 'nullable|string',
+            'podcast_url' => 'nullable|string',
+            'featured_image_url' => 'nullable|string',
+            'video_type' => 'nullable|string',
+            'order_index' => 'nullable|integer',
+            'estimated_time' => 'nullable|integer',
+            'prerequisite_id' => 'nullable|string',
+            'is_published' => 'nullable|boolean',
         ]);
+
+        $contentText = $request->input('content_text') ?? $request->input('lesson_content');
 
         $lesson = Lesson::create([
             'title' => $request->title,
@@ -257,12 +266,16 @@ public function updatePost(Request $request, string $id)
             'description' => $request->description,
             'video_url' => $request->video_url,
             'podcast_url' => $request->podcast_url,
-            'content_text' => $request->lesson_content,
+            'featured_image_url' => $request->featured_image_url,
+            'video_type' => $request->video_type ?? 'aparat',
+            'content_text' => $contentText,
             'order_index' => $request->order_index ?? 0,
-            'is_published' => true,
+            'estimated_time' => $request->estimated_time,
+            'prerequisite_id' => $request->filled('prerequisite_id') ? $request->prerequisite_id : null,
+            'is_published' => $request->has('is_published') ? (bool)$request->is_published : true,
         ]);
 
-        return response()->json($lesson, 201);
+        return response()->json($lesson->load('category'), 201);
     }
 
     public function updateLesson(Request $request, string $id)
@@ -275,16 +288,24 @@ public function updatePost(Request $request, string $id)
 
         $data = $request->only([
             'title', 'category_id', 'description', 
-            'video_url', 'podcast_url', 'order_index'
+            'video_url', 'podcast_url', 'order_index',
+            'featured_image_url', 'video_type', 'estimated_time',
+            'is_published'
         ]);
-        
-        if ($request->has('lesson_content')) {
+
+        if ($request->has('prerequisite_id')) {
+            $data['prerequisite_id'] = $request->filled('prerequisite_id') ? $request->prerequisite_id : null;
+        }
+
+        if ($request->has('content_text')) {
+            $data['content_text'] = $request->content_text;
+        } elseif ($request->has('lesson_content')) {
             $data['content_text'] = $request->lesson_content;
         }
         
         $lesson->update($data);
 
-        return response()->json($lesson);
+        return response()->json($lesson->load('category'));
     }
 
     public function deleteLesson(Request $request, string $id)

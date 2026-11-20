@@ -65,7 +65,7 @@ class CommentController extends Controller
     {
         $comment = Comment::findOrFail($id);
         
-        if ($comment->user_id !== $request->user()->id && $request->user()->profile->role !== 'admin') {
+        if ($comment->user_id !== $request->user()->id && $request->user()->profile?->role !== 'admin') {
             return response()->json(['message' => 'عدم دسترسی'], 403);
         }
         

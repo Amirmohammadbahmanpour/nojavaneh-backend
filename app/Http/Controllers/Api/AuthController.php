@@ -95,10 +95,15 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        $profile = Profile::firstOrCreate(
+            ['user_id' => $user->id],
+            ['role' => 'user']
+        );
+
         return response()->json([
             'token' => $token,
             'user' => $user,
-            'profile' => $user->profile,
+            'profile' => $profile,
         ]);
     }
 
@@ -188,7 +193,9 @@ class AuthController extends Controller
     // 6. خروج از سیستم
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        if ($request->user()) {
+            $request->user()->currentAccessToken()?->delete();
+        }
         return response()->json(['message' => 'خروج موفقیت آمیز بود']);
     }
     
