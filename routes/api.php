@@ -118,6 +118,33 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/upload/image', [AdminController::class, 'uploadImage']);
 });
 
+// ========== مسیر کمکی اجرای مایگریشن و پاکسازی کش هاست ==========
+Route::get('/migrate-db-update', function (\Illuminate\Http\Request $request) {
+    if ($request->get('key') !== 'noojavaneh_update_2026') {
+        return response()->json(['error' => 'Unauthorized key'], 403);
+    }
+
+    try {
+        \Artisan::call('migrate', ['--force' => true]);
+        $migrateOutput = \Artisan::output();
+
+        \Artisan::call('config:clear');
+        \Artisan::call('route:clear');
+        \Artisan::call('cache:clear');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'مایگریشن‌ها با موفقیت اجرا و کش لاراول پاکسازی شد.',
+            'migrate_output' => $migrateOutput,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+});
+
 // ========== مسیرهای تست (فقط برای توسعه) ==========
 if (app()->environment('local')) {
     Route::get('/test-route', function () {
