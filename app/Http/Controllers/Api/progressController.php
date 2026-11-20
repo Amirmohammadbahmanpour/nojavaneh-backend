@@ -29,9 +29,10 @@ class ProgressController extends Controller
 
         // چک کن درس قفل نباشه
         $lesson = Lesson::findOrFail($request->lesson_id);
+        $userId = $request->user()->id;
         
         if ($lesson->prerequisite_id) {
-            $prerequisiteProgress = UserProgress::where('user_id', $request->user()->id)
+            $prerequisiteProgress = UserProgress::where('user_id', $userId)
                 ->where('lesson_id', $lesson->prerequisite_id)
                 ->first();
             
@@ -39,6 +40,24 @@ class ProgressController extends Controller
                 return response()->json([
                     'message' => 'ابتدا باید درس پیش‌نیاز را کامل کنید'
                 ], 403);
+            }
+        } else {
+            $prevLesson = Lesson::where('category_id', $lesson->category_id)
+                ->where('is_published', true)
+                ->where('order_index', '<', $lesson->order_index)
+                ->orderBy('order_index', 'desc')
+                ->first();
+
+            if ($prevLesson) {
+                $prevProgress = UserProgress::where('user_id', $userId)
+                    ->where('lesson_id', $prevLesson->id)
+                    ->first();
+
+                if (!$prevProgress || !$prevProgress->is_completed) {
+                    return response()->json([
+                        'message' => 'ابتدا باید درس قبلی را کامل کنید'
+                    ], 403);
+                }
             }
         }
         

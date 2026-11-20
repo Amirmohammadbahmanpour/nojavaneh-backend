@@ -60,23 +60,37 @@ class LessonController extends Controller
         $lessonArray = $lesson->toArray();
         $lessonArray['is_completed'] = $isCompleted;
         
-        // اضافه کردن وضعیت قفل (اگر درس پیش‌نیاز دارد)
+        // اضافه کردن وضعیت قفل (اگر درس پیش‌نیاز دارد یا درس قبلی کامل نشده)
         $isLocked = false;
-        if ($lesson->prerequisite_id && $userId) {
-            $prerequisiteProgress = UserProgress::where('user_id', $userId)
-                ->where('lesson_id', $lesson->prerequisite_id)
-                ->first();
-            $isLocked = !($prerequisiteProgress && $prerequisiteProgress->is_completed === true);
-            $lessonArray['is_locked'] = $isLocked;
-        } else {
-            $lessonArray['is_locked'] = false;
+        $prerequisiteTitle = null;
+
+        if ($userId) {
+            if ($lesson->prerequisite_id) {
+                $prerequisite = Lesson::find($lesson->prerequisite_id);
+                $prerequisiteProgress = UserProgress::where('user_id', $userId)
+                    ->where('lesson_id', $lesson->prerequisite_id)
+                    ->first();
+                $isLocked = !($prerequisiteProgress && $prerequisiteProgress->is_completed === true);
+                $prerequisiteTitle = $prerequisite ? $prerequisite->title : null;
+            } else {
+                $prevLesson = Lesson::where('category_id', $lesson->category_id)
+                    ->where('is_published', true)
+                    ->where('order_index', '<', $lesson->order_index)
+                    ->orderBy('order_index', 'desc')
+                    ->first();
+
+                if ($prevLesson) {
+                    $prevProgress = UserProgress::where('user_id', $userId)
+                        ->where('lesson_id', $prevLesson->id)
+                        ->first();
+                    $isLocked = !($prevProgress && $prevProgress->is_completed === true);
+                    $prerequisiteTitle = $prevLesson->title;
+                }
+            }
         }
-        
-        // اضافه کردن نام درس پیش‌نیاز (برای نمایش در قفل)
-        if ($lesson->prerequisite_id && $isLocked) {
-            $prerequisite = Lesson::find($lesson->prerequisite_id);
-            $lessonArray['prerequisite_title'] = $prerequisite ? $prerequisite->title : null;
-        }
+
+        $lessonArray['is_locked'] = $isLocked;
+        $lessonArray['prerequisite_title'] = $isLocked ? $prerequisiteTitle : null;
         
         return response()->json($lessonArray);
     }
