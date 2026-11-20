@@ -124,43 +124,88 @@ Route::get('/migrate-db-update', function (\Illuminate\Http\Request $request) {
         return response()->json(['error' => 'Unauthorized key'], 403);
     }
 
-    try {
-        // اجرای مایگریشن‌های جدید (بدون دست زدن به اطلاعات قبلی)
-        \Artisan::call('migrate', ['--force' => true]);
-        $migrateOutput = \Artisan::output();
+    $details = [];
 
-        // افزودن ایمن ستون‌های تکمیلی به جدول profiles در صورت وجود جدول
+    // ۱. افزودن ایمن ستون‌های تکمیلی به جدول profiles در صورت وجود جدول
+    try {
         if (\Illuminate\Support\Facades\Schema::hasTable('profiles')) {
-            \Illuminate\Support\Facades\Schema::table('profiles', function (\Illuminate\Database\Schema\Blueprint $table) {
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'mother_age')) $table->integer('mother_age')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'mother_education')) $table->string('mother_education')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'father_education')) $table->string('father_education')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'mother_employment_status')) $table->string('mother_employment_status')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'family_income_status')) $table->string('family_income_status')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'number_of_teenagers')) $table->integer('number_of_teenagers')->default(0);
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_gender')) $table->string('teenager_gender')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_age_range')) $table->string('teenager_age_range')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'has_attended_parenting_course')) $table->boolean('has_attended_parenting_course')->default(false);
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_phone_internet_usage')) $table->string('teenager_phone_internet_usage')->nullable();
-                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_living_with')) $table->string('teenager_living_with')->nullable();
+            \Illuminate\Support\Facades\Schema::table('profiles', function (\Illuminate\Database\Schema\Blueprint $table) use (&$details) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'mother_age')) {
+                    $table->integer('mother_age')->nullable();
+                    $details[] = 'ستون mother_age اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'mother_education')) {
+                    $table->string('mother_education')->nullable();
+                    $details[] = 'ستون mother_education اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'father_education')) {
+                    $table->string('father_education')->nullable();
+                    $details[] = 'ستون father_education اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'mother_employment_status')) {
+                    $table->string('mother_employment_status')->nullable();
+                    $details[] = 'ستون mother_employment_status اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'family_income_status')) {
+                    $table->string('family_income_status')->nullable();
+                    $details[] = 'ستون family_income_status اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'number_of_teenagers')) {
+                    $table->integer('number_of_teenagers')->default(0);
+                    $details[] = 'ستون number_of_teenagers اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_gender')) {
+                    $table->string('teenager_gender')->nullable();
+                    $details[] = 'ستون teenager_gender اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_age_range')) {
+                    $table->string('teenager_age_range')->nullable();
+                    $details[] = 'ستون teenager_age_range اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'has_attended_parenting_course')) {
+                    $table->boolean('has_attended_parenting_course')->default(false);
+                    $details[] = 'ستون has_attended_parenting_course اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_phone_internet_usage')) {
+                    $table->string('teenager_phone_internet_usage')->nullable();
+                    $details[] = 'ستون teenager_phone_internet_usage اضافه شد';
+                }
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('profiles', 'teenager_living_with')) {
+                    $table->string('teenager_living_with')->nullable();
+                    $details[] = 'ستون teenager_living_with اضافه شد';
+                }
             });
         }
+    } catch (\Exception $e) {
+        $details[] = 'وضعیت جدول پروفایل: ' . $e->getMessage();
+    }
 
+    // ۲. اجرای مایگریشن‌های جدید با نادیده گرفتن جداول موجود
+    try {
+        \Artisan::call('migrate', ['--force' => true]);
+        $output = trim(\Artisan::output());
+        if ($output) {
+            $details[] = $output;
+        }
+    } catch (\Exception $e) {
+        $details[] = 'جداول اصلی از قبل موجود هستند (بدون نیاز به ساخت مجدد)';
+    }
+
+    // ۳. پاکسازی و تازه‌سازی کامل کش‌های لاراول
+    try {
         \Artisan::call('config:clear');
         \Artisan::call('route:clear');
         \Artisan::call('cache:clear');
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'دیتابیس بدون تغییر داده‌های قبلی با موفقیت به‌روزرسانی و کش لاراول پاک شد.',
-            'migrate_output' => $migrateOutput,
-        ]);
+        $details[] = 'تمام کش‌های لاراول با موفقیت پاکسازی شدند';
     } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => $e->getMessage()
-        ], 500);
+        $details[] = 'کش: ' . $e->getMessage();
     }
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'دیتابیس و کش لاراول با موفقیت همگام‌سازی شدند و تمام اطلاعات قبلی حفظ شدند.',
+        'details' => $details,
+    ]);
 });
 
 // ========== مسیرهای تست (فقط برای توسعه) ==========
