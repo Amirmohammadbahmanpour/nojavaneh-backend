@@ -14,10 +14,43 @@ use Kavenegar\KavenegarApi;
 
 class AuthController extends Controller
 {
+    // ارسال پیامک با کاوه‌نگار (سرویس اعتبارسنجی VerifyLookup یا ارسال استاندارد)
+    private function sendSmsViaKavenegar(string $phone, int $code, string $type = 'otp'): array
+    {
+        $apiKey = env('KAVENEGAR_API_KEY');
+        if (!$apiKey) {
+            \Log::warning("KAVENEGAR_API_KEY is not set in environment.");
+            return ['success' => false, 'error' => 'API Key not configured'];
+        }
+
+        try {
+            $api = new KavenegarApi($apiKey);
+            $template = env('KAVENEGAR_TEMPLATE', 'verify');
+
+            // اول سعی می‌کنیم با VerifyLookup (اعتبارسنجی خدماتی سریع - عبور از بلک‌لیست) ارسال کنیم
+            try {
+                $api->VerifyLookup($phone, (string)$code, null, null, $template);
+                \Log::info("Kavenegar VerifyLookup sent successfully to {$phone} with code {$code} (template: {$template})");
+                return ['success' => true, 'method' => 'VerifyLookup'];
+            } catch (\Exception $templateError) {
+                \Log::warning("Kavenegar VerifyLookup failed: " . $templateError->getMessage() . ". Falling back to standard Send.");
+
+                // در صورت عدم تعریف الگو، با خط پیامکی ارسال می‌شود
+                $sender = env('KAVENEGAR_SENDER_NUMBER', '');
+                $message = "کد تایید شما در نوجوانه: {$code}";
+                $api->Send($sender, $phone, $message);
+                \Log::info("Kavenegar Standard Send sent successfully to {$phone}");
+                return ['success' => true, 'method' => 'Send'];
+            }
+        } catch (\Exception $e) {
+            \Log::error("Kavenegar SMS delivery failed for {$phone}: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     // 1. ارسال کد تایید برای ثبت‌نام
     public function sendOtp(Request $request)
     {
-        // فقط validation
         $request->validate([
             'phone' => 'required|string|regex:/^09[0-9]{9}$/'
         ]);
@@ -25,10 +58,23 @@ class AuthController extends Controller
         $code = rand(100000, 999999);
         Cache::put('otp_' . $request->phone, $code, 300);
         
-        // فقط لاگ بزن (بدون ارسال واقعی)
-        \Log::info("OTP for {$request->phone}: {$code}");
+        \Log::info("OTP generated for {$request->phone}: {$code}");
         
-        return response()->json(['message' => 'کد تایید ارسال شد (تست)']);
+        $smsResult = $this->sendSmsViaKavenegar($request->phone, $code, 'otp');
+        
+        $response = [
+            'message' => $smsResult['success'] ? 'کد تایید با پیامک ارسال شد' : 'کد تایید ارسال شد',
+            'sent' => $smsResult['success'],
+        ];
+
+        if (config('app.debug') || !$smsResult['success']) {
+            $response['debug_code'] = $code;
+            if (!$smsResult['success']) {
+                $response['sms_error'] = $smsResult['error'] ?? 'خطا در سرویس پیامک';
+            }
+        }
+        
+        return response()->json($response);
     }
 
     // 2. ثبت‌نام با کد تایید
@@ -209,9 +255,20 @@ class AuthController extends Controller
         $code = rand(100000, 999999);
         Cache::put('reset_' . $request->phone, $code, 300);
         
-        Log::info('Reset code for ' . $request->phone . ': ' . $code);
-        
-        return response()->json(['message' => 'کد بازنشانی ارسال شد']);
+        Log::info('Reset code generated for ' . $request->phone . ': ' . $code);
+
+        $smsResult = $this->sendSmsViaKavenegar($request->phone, $code, 'reset');
+
+        $response = [
+            'message' => $smsResult['success'] ? 'کد بازنشانی با پیامک ارسال شد' : 'کد بازنشانی ارسال شد',
+            'sent' => $smsResult['success'],
+        ];
+
+        if (config('app.debug') || !$smsResult['success']) {
+            $response['debug_code'] = $code;
+        }
+
+        return response()->json($response);
     }
     
     // 8. بازنشانی رمز عبور
