@@ -57,4 +57,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(BlogPost::class, 'author_id');
     }
+
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
+    public function ticketMessages()
+    {
+        return $this->hasMany(TicketMessage::class);
+    }
 }

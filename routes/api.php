@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\LikeController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ExamController;
+use App\Http\Controllers\Api\TicketController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -83,6 +84,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user-exams', [ExamController::class, 'store']);
     Route::get('/user-exams/latest', [ExamController::class, 'latest']);
     
+    // تیکت‌ها و پشتیبانی کاربر
+    Route::get('/tickets', [TicketController::class, 'index']);
+    Route::post('/tickets', [TicketController::class, 'store']);
+    Route::get('/tickets/{id}', [TicketController::class, 'show']);
+    Route::post('/tickets/{id}/reply', [TicketController::class, 'reply']);
+    Route::put('/tickets/{id}/close', [TicketController::class, 'close']);
+    
     // ✅ مسیر تست برای دیباگ
     Route::get('/debug-progress', [ProgressController::class, 'index']);
 });
@@ -116,6 +124,13 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::put('/lessons/{id}', [AdminController::class, 'updateLesson']);
     Route::delete('/lessons/{id}', [AdminController::class, 'deleteLesson']);
     Route::post('/upload/image', [AdminController::class, 'uploadImage']);
+
+    // مدیریت تیکت‌ها و پشتیبانی
+    Route::get('/tickets', [TicketController::class, 'adminIndex']);
+    Route::get('/tickets/{id}', [TicketController::class, 'adminShow']);
+    Route::post('/tickets/{id}/reply', [TicketController::class, 'adminReply']);
+    Route::put('/tickets/{id}/status', [TicketController::class, 'adminUpdateStatus']);
+    Route::delete('/tickets/{id}', [TicketController::class, 'adminDestroy']);
 });
 
 // ========== مسیر کمکی اجرای مایگریشن و پاکسازی کش هاست ==========
@@ -180,7 +195,36 @@ Route::get('/migrate-db-update', function (\Illuminate\Http\Request $request) {
         $details[] = 'وضعیت جدول پروفایل: ' . $e->getMessage();
     }
 
-    // ۲. اجرای مایگریشن‌های جدید با نادیده گرفتن جداول موجود
+    // ۲. ایجاد ایمن جداول تیکت‌ها و پیام‌ها در صورت عدم وجود
+    try {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('tickets')) {
+            \Illuminate\Support\Facades\Schema::create('tickets', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+                $table->string('subject');
+                $table->string('category')->default('technical');
+                $table->string('status')->default('pending');
+                $table->string('priority')->default('medium');
+                $table->timestamps();
+            });
+            $details[] = 'جدول tickets با موفقیت ساخته شد';
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasTable('ticket_messages')) {
+            \Illuminate\Support\Facades\Schema::create('ticket_messages', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->id();
+                $table->foreignId('ticket_id')->constrained('tickets')->onDelete('cascade');
+                $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+                $table->text('message');
+                $table->boolean('is_admin')->default(false);
+                $table->timestamps();
+            });
+            $details[] = 'جدول ticket_messages با موفقیت ساخته شد';
+        }
+    } catch (\Exception $e) {
+        $details[] = 'وضعیت جداول تیکت: ' . $e->getMessage();
+    }
+
+    // ۳. اجرای مایگریشن‌های جدید با نادیده گرفتن جداول موجود
     try {
         \Artisan::call('migrate', ['--force' => true]);
         $output = trim(\Artisan::output());
@@ -191,7 +235,7 @@ Route::get('/migrate-db-update', function (\Illuminate\Http\Request $request) {
         $details[] = 'جداول اصلی از قبل موجود هستند (بدون نیاز به ساخت مجدد)';
     }
 
-    // ۳. پاکسازی و تازه‌سازی کامل کش‌های لاراول
+    // ۴. پاکسازی و تازه‌سازی کامل کش‌های لاراول
     try {
         \Artisan::call('config:clear');
         \Artisan::call('route:clear');
