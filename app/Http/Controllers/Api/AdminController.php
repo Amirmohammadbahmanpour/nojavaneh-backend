@@ -50,12 +50,29 @@ class AdminController extends Controller
             return response()->json(['message' => 'دسترسی غیرمجاز'], 403);
         }
 
-        $totalLessons = Lesson::count();
-        $users = User::with('profile')->orderBy('created_at', 'desc')->get();
+        $totalLessons = 0;
+        try {
+            $totalLessons = Lesson::count();
+        } catch (\Throwable $e) {
+            Log::error('AdminController users Lesson::count error: ' . $e->getMessage());
+        }
 
+        $users = User::with('profile')->orderBy('created_at', 'desc')->get();
         $userIds = $users->pluck('id');
-        $allExams = UserExam::whereIn('user_id', $userIds)->get()->groupBy('user_id');
-        $allProgress = UserProgress::whereIn('user_id', $userIds)->where('is_completed', true)->get()->groupBy('user_id');
+
+        $allExams = collect();
+        try {
+            $allExams = UserExam::whereIn('user_id', $userIds)->get()->groupBy('user_id');
+        } catch (\Throwable $e) {
+            Log::error('AdminController users UserExam error: ' . $e->getMessage());
+        }
+
+        $allProgress = collect();
+        try {
+            $allProgress = UserProgress::whereIn('user_id', $userIds)->where('is_completed', true)->get()->groupBy('user_id');
+        } catch (\Throwable $e) {
+            Log::error('AdminController users UserProgress error: ' . $e->getMessage());
+        }
 
         $formattedUsers = $users->map(function ($user) use ($allExams, $allProgress, $totalLessons) {
             $userExams = $allExams->get($user->id, collect());
@@ -111,7 +128,7 @@ class AdminController extends Controller
             ];
         });
 
-        return response()->json($formattedUsers);
+        return response()->json($formattedUsers->values());
     }
 
     // دریافت جزئیات یک کاربر
