@@ -103,6 +103,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     
     // مدیریت کاربران
     Route::get('/users', [AdminController::class, 'users']);
+    Route::get('/users/{id}', [AdminController::class, 'showUser']);
     Route::put('/users/{id}/role', [AdminController::class, 'changeRole']);
     Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
     

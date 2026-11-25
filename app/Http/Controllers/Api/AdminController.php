@@ -8,6 +8,8 @@ use App\Models\Profile;
 use App\Models\BlogPost;
 use App\Models\Comment;
 use App\Models\Lesson;
+use App\Models\UserExam;
+use App\Models\UserProgress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -48,18 +50,131 @@ class AdminController extends Controller
             return response()->json(['message' => 'دسترسی غیرمجاز'], 403);
         }
 
+        $totalLessons = Lesson::count();
         $users = User::with('profile')->orderBy('created_at', 'desc')->get();
 
-        $formattedUsers = $users->map(function ($user) {
+        $userIds = $users->pluck('id');
+        $allExams = UserExam::whereIn('user_id', $userIds)->get()->groupBy('user_id');
+        $allProgress = UserProgress::whereIn('user_id', $userIds)->where('is_completed', true)->get()->groupBy('user_id');
+
+        $formattedUsers = $users->map(function ($user) use ($allExams, $allProgress, $totalLessons) {
+            $userExams = $allExams->get($user->id, collect());
+            $pretest = $userExams->where('exam_type', 'pretest')->sortByDesc('created_at')->first();
+            $posttest = $userExams->where('exam_type', 'posttest')->sortByDesc('created_at')->first();
+            
+            $completedLessonsCount = $allProgress->get($user->id, collect())->count();
+
+            // وضعیت پیشرفت و یادگیری کاربر
+            $status = 'شروع نکرده (بدون آزمون اولیه)';
+            $statusKey = 'not_started';
+            if ($posttest && ($posttest->is_passed || $posttest->score >= 60)) {
+                $status = '🎓 فارغ‌التحصیل دوره';
+                $statusKey = 'graduated';
+            } elseif ($posttest) {
+                $status = 'شرکت در آزمون نهایی (نمره ' . $posttest->score . ')';
+                $statusKey = 'posttest_taken';
+            } elseif ($pretest) {
+                $status = '📚 در حال یادگیری (' . $completedLessonsCount . ' از ' . $totalLessons . ' درس)';
+                $statusKey = 'learning';
+            }
+
             return [
                 'id' => $user->id,
-                'full_name' => $user->profile?->full_name,
+                'full_name' => $user->profile?->full_name ?? $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
                 'role' => $user->profile?->role ?? 'user',
+                'created_at' => $user->created_at?->toIso8601String(),
+                'pretest_score' => $pretest ? $pretest->score : null,
+                'pretest_date' => $pretest ? $pretest->created_at?->toIso8601String() : null,
+                'posttest_score' => $posttest ? $posttest->score : null,
+                'posttest_date' => $posttest ? $posttest->created_at?->toIso8601String() : null,
+                'completed_lessons' => $completedLessonsCount,
+                'total_lessons' => $totalLessons,
+                'learning_status' => $status,
+                'learning_status_key' => $statusKey,
+                'profile_details' => [
+                    'age' => $user->profile?->age,
+                    'mother_age' => $user->profile?->mother_age,
+                    'mother_education' => $user->profile?->mother_education,
+                    'father_education' => $user->profile?->father_education,
+                    'mother_employment_status' => $user->profile?->mother_employment_status,
+                    'family_income_status' => $user->profile?->family_income_status,
+                    'number_of_children' => $user->profile?->number_of_children,
+                    'number_of_teenagers' => $user->profile?->number_of_teenagers,
+                    'teenager_gender' => $user->profile?->teenager_gender,
+                    'teenager_age_range' => $user->profile?->teenager_age_range,
+                    'has_attended_parenting_course' => $user->profile?->has_attended_parenting_course,
+                    'teenager_phone_internet_usage' => $user->profile?->teenager_phone_internet_usage,
+                    'teenager_living_with' => $user->profile?->teenager_living_with,
+                ]
             ];
         });
 
         return response()->json($formattedUsers);
+    }
+
+    // دریافت جزئیات یک کاربر
+    public function showUser(Request $request, string $id)
+    {
+        if (!$this->isAdmin($request)) {
+            return response()->json(['message' => 'دسترسی غیرمجاز'], 403);
+        }
+
+        $user = User::with('profile')->find($id);
+        if (!$user) {
+            return response()->json(['message' => 'کاربر یافت نشد'], 404);
+        }
+
+        $totalLessons = Lesson::count();
+        $pretest = UserExam::where('user_id', $user->id)->where('exam_type', 'pretest')->orderBy('created_at', 'desc')->first();
+        $posttest = UserExam::where('user_id', $user->id)->where('exam_type', 'posttest')->orderBy('created_at', 'desc')->first();
+        $completedLessonsCount = UserProgress::where('user_id', $user->id)->where('is_completed', true)->count();
+
+        $status = 'شروع نکرده (بدون آزمون اولیه)';
+        $statusKey = 'not_started';
+        if ($posttest && ($posttest->is_passed || $posttest->score >= 60)) {
+            $status = '🎓 فارغ‌التحصیل دوره';
+            $statusKey = 'graduated';
+        } elseif ($posttest) {
+            $status = 'شرکت در آزمون نهایی (نمره ' . $posttest->score . ')';
+            $statusKey = 'posttest_taken';
+        } elseif ($pretest) {
+            $status = '📚 در حال یادگیری (' . $completedLessonsCount . ' از ' . $totalLessons . ' درس)';
+            $statusKey = 'learning';
+        }
+
+        return response()->json([
+            'id' => $user->id,
+            'full_name' => $user->profile?->full_name ?? $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => $user->profile?->role ?? 'user',
+            'created_at' => $user->created_at?->toIso8601String(),
+            'pretest_score' => $pretest ? $pretest->score : null,
+            'pretest_date' => $pretest ? $pretest->created_at?->toIso8601String() : null,
+            'posttest_score' => $posttest ? $posttest->score : null,
+            'posttest_date' => $posttest ? $posttest->created_at?->toIso8601String() : null,
+            'completed_lessons' => $completedLessonsCount,
+            'total_lessons' => $totalLessons,
+            'learning_status' => $status,
+            'learning_status_key' => $statusKey,
+            'profile_details' => [
+                'age' => $user->profile?->age,
+                'mother_age' => $user->profile?->mother_age,
+                'mother_education' => $user->profile?->mother_education,
+                'father_education' => $user->profile?->father_education,
+                'mother_employment_status' => $user->profile?->mother_employment_status,
+                'family_income_status' => $user->profile?->family_income_status,
+                'number_of_children' => $user->profile?->number_of_children,
+                'number_of_teenagers' => $user->profile?->number_of_teenagers,
+                'teenager_gender' => $user->profile?->teenager_gender,
+                'teenager_age_range' => $user->profile?->teenager_age_range,
+                'has_attended_parenting_course' => $user->profile?->has_attended_parenting_course,
+                'teenager_phone_internet_usage' => $user->profile?->teenager_phone_internet_usage,
+                'teenager_living_with' => $user->profile?->teenager_living_with,
+            ]
+        ]);
     }
 
     public function changeRole(Request $request, string $id)
